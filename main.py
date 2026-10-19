@@ -19,7 +19,7 @@ model = genai.GenerativeModel('gemini-1.5-flash')
 class UserText(BaseModel):
     text: str
 
-# Наш финальный промпт (тот самый, с типами и энергией)
+# Наш финальный промпт (с типами и энергией)
 SYSTEM_PROMPT = """
 Ты — экспертный ИИ-ассистент приложения "Second Brain". Твоя задача — анализировать текст пользователя и структурировать его строго по правилам.
 
@@ -65,25 +65,30 @@ SYSTEM_PROMPT = """
 @app.post("/process")
 async def process_text(user_input: UserText):
     try:
+        # Отправляем запрос в Gemini
         response = model.generate_content(
             f"{SYSTEM_PROMPT}\n\nТекст пользователя: {user_input.text}"
         )
         
         clean_response = response.text.strip()
-        # Очистка от случайных markdown-тегов
-        if clean_response.startswith("```json"):
-            clean_response = clean_response[7:]
-        if clean_response.endswith("```"):
-            clean_response = clean_response[:-3]
-        clean_response = clean_response.strip()
         
+        # Ищем первую фигурную скобку и последнюю, чтобы вырезать только JSON
+        start_idx = clean_response.find('{')
+        end_idx = clean_response.rfind('}')
+        
+        if start_idx != -1 and end_idx != -1:
+            clean_response = clean_response[start_idx:end_idx+1]
+        
+        # Парсим в JSON
         parsed_data = json.loads(clean_response)
         return parsed_data
         
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="ИИ вернул некорректный JSON")
+    except json.JSONDecodeError as e:
+        # Если ИИ вернул что-то не то, мы вернем эту ошибку и сырой текст
+        return {"error": "ИИ вернул некорректный JSON", "raw_text": response.text if 'response' in locals() else "Нет ответа"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Ловим все остальные ошибки и возвращаем их текст
+        return {"error": "Произошла ошибка", "details": str(e)}
 
 @app.get("/")
 def read_root():
