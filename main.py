@@ -13,8 +13,8 @@ if not GEMINI_API_KEY:
 
 genai.configure(api_key=GEMINI_API_KEY)
 
-# Используем быструю модель
-model = genai.GenerativeModel('gemini-1.5-flash')
+# Используем АКТУАЛЬНУЮ модель Gemini 2.5 Flash
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 class UserText(BaseModel):
     text: str
